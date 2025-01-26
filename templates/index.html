@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Audio Recorder</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        td {
+            vertical-align: top;
+            padding: 10px;
+        }
+        h2 {
+            color: #333;
+        }
+        textarea {
+            width: 100%;
+        }
+        button {
+            margin: 5px 0;
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        audio {
+            display: block;
+            margin: 10px 0;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        ul li {
+            margin: 10px 0;
+        }
+        a {
+            color: #007BFF;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <table>
+        <tr>
+            <td style="width:50%">
+                <h2>Record and Upload Audio</h2>
+
+                <button id="record">Record</button>
+                <button id="stop">Stop</button>
+                <span id="timer">00:00</span>
+                <audio id="audio"></audio>
+                <form id="uploadForm" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="audio_data" id="audioData">
+                </form>
+                <script src="script.js"></script>
+                <hl></hl>
+                <h2>Recorded Files</h2>
+                <ul>
+                    {% for file in files %}
+                    <li> 
+                        <audio controls>
+                            <source src="{{ url_for('uploaded_file', filename=file) }}">
+                            Your browser does not support the audio element.
+                        </audio><br>
+                        {{file}}
+                        <a href="uploads/{{file}}.txt">{{file}}.txt</a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </td>
+            <td style="width:50%">
+                <h2>Type in your text to generate audio</h2>
+
+                <form action="/upload_text" method="post">
+                  <textarea name="text" rows="10" placeholder="Type your text here..."></textarea>
+                  <br>
+                  <input type="submit" value="Generate Audio">
+                </form>
+
+                <h2>Generated Audio Files</h2>
+                <ul>
+                    {% for tts_file in tts_files %}
+                    <li>
+                        <audio controls>
+                            <source src="{{ url_for('tts_file', filename=tts_file) }}">
+                            Your browser does not support the audio element.
+                        </audio><br>
+                        <strong>{{ tts_file }}</strong>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>
