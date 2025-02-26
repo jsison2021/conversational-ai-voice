@@ -8,10 +8,11 @@
 
     <table style="width:100%">
         <tr>
+            <!-- Speech to Text Section -->
             <td style="width:50%">
                 <div class="column-label">Speech to Text</div>
                 <h2>Record and Upload Audio</h2>
-            
+
                 <button id="record">Record</button>
                 <button id="stop">Stop</button>
                 <span id="timer">00:00</span>
@@ -20,49 +21,70 @@
                     <input type="hidden" name="audio_data" id="audioData">
                 </form>
                 <script src="script.js"></script>
+
                 <hr>
                 <h2>Recorded Files</h2>
                 <ul>
                     {% for file in STT_files %}
                         {% if file.endswith('.wav') %}
                             <li>
+                                <strong>Audio:</strong><br>
                                 <audio controls>
                                     <source src="{{ url_for('uploaded_file', filename=file) }}">
                                     Your browser does not support the audio element.
                                 </audio><br>
-                                {{ file }}
-                                <a href="{{ url_for('uploaded_file', filename=file.replace('.wav', '.txt')) }}" target="_blank">{{ file.replace('.wav', '.txt') }}</a>
+                                <strong>Text Transcript:</strong><br>
+                                <a href="{{ url_for('uploaded_file', filename=file.replace('.wav', '_text.txt')) }}" target="_blank">
+                                    {{ file.replace('.wav', '_text.txt') }}
+                                </a><br>
+                                <strong>Sentiment Analysis:</strong><br>
+                                <a href="{{ url_for('uploaded_file', filename=file.replace('.wav', '_sentiment.txt')) }}" target="_blank">
+                                    {{ file.replace('.wav', '_sentiment.txt') }}
+                                </a>
                             </li>
+                            <hr>
                         {% endif %}
                     {% endfor %}
                 </ul>
             </td>
             
+            <!-- Text to Speech Section -->
             <td style="width:50%">
                 <div class="column-label">Text to Speech</div>
                 <h2>Type in your text to generate audio</h2>
 
                 <form action="/upload_text" method="post">
-                  <textarea name="text" rows="10" cols="50"></textarea>
-                  <br>
-                  <input type="submit" value="Upload">
+                    <textarea name="text" rows="10" cols="50"></textarea>
+                    <br>
+                    <input type="submit" value="Generate Audio">
                 </form>
 
-                <h2>Text-to-Speech Files</h2>
+                <h2>Generated Speech Files</h2>
                 <ul>
-                {% for file in TTS_files %}
-                <li>
-                    <audio controls>
-                    <source src="{{ url_for('uploaded_file', filename=file) }}" type="audio/wav">
-                    Your browser does not support the audio element.
-                    </audio>
-                    {{ file }}
-                </li>
-                {% endfor %}
+                    {% for file in TTS_files %}
+                        {% if file.endswith('.wav') %}
+                            <li>
+                                <strong>Audio:</strong><br>
+                                <audio controls>
+                                    <source src="{{ url_for('uploaded_file', filename=file) }}" type="audio/wav">
+                                    Your browser does not support the audio element.
+                                </audio><br>
+                                <strong>Original Text:</strong><br>
+                                <a href="{{ url_for('uploaded_file', filename=file.replace('.wav', '_text.txt')) }}" target="_blank">
+                                    {{ file.replace('.wav', '_text.txt') }}
+                                </a><br>
+                                <strong>Sentiment Analysis:</strong><br>
+                                <a href="{{ url_for('uploaded_file', filename=file.replace('.wav', '_sentiment.txt')) }}" target="_blank">
+                                    {{ file.replace('.wav', '_sentiment.txt') }}
+                                </a>
+                            </li>
+                            <hr>
+                        {% endif %}
+                    {% endfor %}
                 </ul>
-
             </td>
         </tr>
     </table>
+
 </body>
 </html>

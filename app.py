@@ -1,7 +1,7 @@
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, send_file, send_from_directory
 from werkzeug.utils import secure_filename
-from google.cloud import speech, texttospeech_v1
+from google.cloud import speech, texttospeech_v1, language_v1
 
 import os
 
@@ -45,6 +45,28 @@ def get_TTS_files():
     files.sort(reverse=True)
     return files
 
+def sample_analyze_sentiment(text_content):
+    client = language_v1.LanguageServiceClient()
+
+    # Configure document for sentiment analysis
+    document = language_v1.Document(
+        content=text_content, type_=language_v1.Document.Type.PLAIN_TEXT
+    )
+
+    # Perform sentiment analysis
+    response = client.analyze_sentiment(request={"document": document})
+    sentiment_score = response.document_sentiment.score
+
+    # Classify sentiment
+    if sentiment_score > 0.2:
+        sentiment_label = "Positive"
+    elif sentiment_score < -0.2:
+        sentiment_label = "Negative"
+    else:
+        sentiment_label = "Neutral"
+
+    return sentiment_label, sentiment_score
+
 @app.route('/')
 def index():
     STT_files = get_STT_files()
@@ -76,28 +98,40 @@ def upload_audio():
     if 'audio_data' not in request.files:
         flash('No audio data')
         return redirect(request.url)
+    
     file = request.files['audio_data']
     if file.filename == '':
         flash('No selected file')
         return redirect(request.url)
+    
     if file:
         # Generate a filename with timestamp
-        filename = datetime.now().strftime("%Y%m%d-%I%M%S%p") + '.wav'
-        file_path = os.path.join(app.config['UPLOAD_STT'], filename)
-        file.save(file_path)
+        timestamp = datetime.now().strftime("%Y%m%d-%I%M%S%p")
+        audio_filename = f"{timestamp}.wav"
+        audio_file_path = os.path.join(app.config['UPLOAD_STT'], audio_filename)
+        file.save(audio_file_path)
 
         # Read the audio file content
-        with open(file_path, 'rb') as f:
-            audio_content = f.read()
+        with open(audio_file_path, 'rb') as audio_file:
+            audio_content = audio_file.read()
 
         # Call the speech-to-text function
         transcript = sample_recognize(audio_content)
 
-        # Save the transcript to a .txt file
-        transcript_filename = filename.replace('.wav', '.txt')
+        # Save the transcript to a .txt file with '_text' suffix
+        transcript_filename = f"{timestamp}_text.txt"  # Changed to '_text'
         transcript_path = os.path.join(app.config['UPLOAD_STT'], transcript_filename)
-        with open(transcript_path, 'w') as txt_file:
-            txt_file.write(transcript)
+        with open(transcript_path, 'w') as transcript_file:
+            transcript_file.write(transcript)
+
+        # Analyze Sentiment of the transcript
+        sentiment_label, sentiment_score = sample_analyze_sentiment(transcript)
+
+        # Save the sentiment result to a .txt file with '_sentiment' suffix
+        sentiment_filename = f"{timestamp}_sentiment.txt"
+        sentiment_path = os.path.join(app.config['UPLOAD_STT'], sentiment_filename)
+        with open(sentiment_path, 'w') as sentiment_file:
+            sentiment_file.write(f"Sentiment: {sentiment_label} (Score: {sentiment_score:.2f})\n")
 
     return redirect('/')  # Success, redirect to homepage
 
@@ -131,25 +165,40 @@ def sample_synthesize_speech(text=None, ssml=None):
 
 @app.route('/upload_text', methods=['POST'])
 def upload_text():
-    # Get the input text from the form
     text = request.form['text']
     
     if not text:
         flash('No text provided')
         return redirect(request.url)
     
-    # Call the Text-to-Speech function
+    # Analyze Sentiment
+    sentiment_label, sentiment_score = sample_analyze_sentiment(text)
+    
+    # Generate speech using TTS
     audio_content = sample_synthesize_speech(text=text)
     
-    # Generate a unique filename for the audio file
-    filename = datetime.now().strftime("%Y%m%d-%I%M%S%p") + '.wav'
-    file_path = os.path.join(app.config['UPLOAD_TTS'], filename)
+    # Generate filenames
+    timestamp = datetime.now().strftime("%Y%m%d-%I%M%S%p")
+    audio_filename = f"{timestamp}.wav"
+    text_filename = f"{timestamp}_text.txt"
+    sentiment_filename = f"{timestamp}_sentiment.txt"
+
+    # Save the text file with sentiment result
+    text_path = os.path.join(app.config['UPLOAD_TTS'], text_filename)
+    with open(text_path, 'w') as text_file:
+        text_file.write(f"Text: {text}\n")
     
-    # Save the audio content to a .wav file
-    with open(file_path, 'wb') as audio_file:
+    # Save sentiment
+    sentiment_path = os.path.join(app.config['UPLOAD_TTS'], sentiment_filename)
+    with open(sentiment_path, 'w') as sentiment_filename:
+        sentiment_filename.write(f"Sentiment: {sentiment_label} (Score: {sentiment_score:.2f})\n")
+
+    # Save the audio file
+    audio_path = os.path.join(app.config['UPLOAD_TTS'], audio_filename)
+    with open(audio_path, 'wb') as audio_file:
         audio_file.write(audio_content)
     
-    return redirect('/')  # Success, redirect to the homepage
+    return redirect('/')
 
 
 @app.route('/script.js',methods=['GET'])
@@ -169,5 +218,5 @@ def uploaded_file(filename):
         return "File not found", 404
 
 if __name__ == '__main__':
-    server_port = os.environ.get('PORT', '8080')
+    server_port = os.environ.get('PORT', '8085')
     app.run(debug=False, port=server_port, host='0.0.0.0')
