@@ -1,14 +1,13 @@
-# Python image to use.
-FROM python:3.12-alpine
+FROM python:3.11
 
-# Set the working directory to /app
+# Set the working directory in the container
 WORKDIR /app
 
-# copy the requirements file used for e
-COPY requirements.txt .
+# Copy the current directory contents into the container at /app
+COPY . .
 
-# Install any needed packages specified in requirements.txt
-RUN pip install --trusted-host pypi.python.org -r requirements.txt
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the working directory contents into the container at /app
 COPY . .
