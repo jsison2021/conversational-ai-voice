@@ -68,7 +68,7 @@ def upload_audio():
 
         sentiment_result = process_audio_with_vertexai(audio_content)
         
-        transcript_filename = f"{timestamp}_text_sentiment.txt"
+        transcript_filename = f"{timestamp}_text_and_sentiment.txt"
         transcript_path = os.path.join(app.config['UPLOAD_STT'], transcript_filename)
         with open(transcript_path, 'w') as transcript_file:
             transcript_file.write(sentiment_result)
