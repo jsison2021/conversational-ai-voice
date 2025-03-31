@@ -33,14 +33,11 @@
                                     <source src="{{ url_for('uploaded_file', filename=file) }}">
                                     Your browser does not support the audio element.
                                 </audio><br>
-                                <strong>Text Transcript:</strong><br>
-                                <a href="{{ url_for('uploaded_file', filename=file.replace('.wav', '_text.txt')) }}" target="_blank">
-                                    {{ file.replace('.wav', '_text.txt') }}
+                                <strong>Text and Sentiment Transcript:</strong><br>
+                                <a href="{{ url_for('uploaded_file', filename=file.replace('.wav', '_text_and_sentiment.txt')) }}" target="_blank">
+                                    {{ file.replace('.wav', '_text_and_sentiment.txt') }}
                                 </a><br>
-                                <strong>Sentiment Analysis:</strong><br>
-                                <a href="{{ url_for('uploaded_file', filename=file.replace('.wav', '_sentiment.txt')) }}" target="_blank">
-                                    {{ file.replace('.wav', '_sentiment.txt') }}
-                                </a>
+                              
                             </li>
                             <hr>
                         {% endif %}
