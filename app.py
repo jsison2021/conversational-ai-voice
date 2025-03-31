@@ -94,5 +94,5 @@ def uploaded_file(filename):
         return "File not found", 404
 
 if __name__ == '__main__':
-    server_port = os.environ.get('PORT', '8085')
+    server_port = os.environ.get('PORT', '8080')
     app.run(debug=False, port=server_port, host='0.0.0.0')
