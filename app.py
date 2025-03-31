@@ -1,7 +1,6 @@
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, send_file, send_from_directory
 from werkzeug.utils import secure_filename
-from google.cloud import speech
 import vertexai
 from vertexai.generative_models import GenerativeModel, Part
 import os
