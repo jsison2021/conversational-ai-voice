@@ -48,41 +48,7 @@
                 </ul>
             </td>
             
-            <!-- Text to Speech Section -->
-            <td style="width:50%">
-                <div class="column-label">Text to Speech</div>
-                <h2>Type in your text to generate audio</h2>
-
-                <form action="/upload_text" method="post">
-                    <textarea name="text" rows="10" cols="50"></textarea>
-                    <br>
-                    <input type="submit" value="Generate Audio">
-                </form>
-
-                <h2>Generated Speech Files</h2>
-                <ul>
-                    {% for file in TTS_files %}
-                        {% if file.endswith('.wav') %}
-                            <li>
-                                <strong>Audio:</strong><br>
-                                <audio controls>
-                                    <source src="{{ url_for('uploaded_file', filename=file) }}" type="audio/wav">
-                                    Your browser does not support the audio element.
-                                </audio><br>
-                                <strong>Original Text:</strong><br>
-                                <a href="{{ url_for('uploaded_file', filename=file.replace('.wav', '_text.txt')) }}" target="_blank">
-                                    {{ file.replace('.wav', '_text.txt') }}
-                                </a><br>
-                                <strong>Sentiment Analysis:</strong><br>
-                                <a href="{{ url_for('uploaded_file', filename=file.replace('.wav', '_sentiment.txt')) }}" target="_blank">
-                                    {{ file.replace('.wav', '_sentiment.txt') }}
-                                </a>
-                            </li>
-                            <hr>
-                        {% endif %}
-                    {% endfor %}
-                </ul>
-            </td>
+            
         </tr>
     </table>
 
