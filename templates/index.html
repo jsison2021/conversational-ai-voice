@@ -10,44 +10,141 @@
         <tr>
             <!-- Speech to Text Section -->
             <td style="width:50%">
-                <div class="column-label">Speech to Text</div>
-                <h2>Record and Upload Audio</h2>
+                <!-- 1. PDF Upload -->
+                <h2>1. Upload a book PDF</h2>
+                <form id="pdfUploadForm" method="POST" action="/upload_pdf" enctype="multipart/form-data">
+                    <input type="file" id="pdfInput" name="pdf_file" accept="application/pdf" required>
+                    <span id="fileName"></span>
+                </form>
 
+                {% for file in STT_files %}
+                    {% if file.endswith('.pdf') %}
+                        <p>Uploaded PDF: {{ file }}</p>
+                    {% endif %}
+                {% endfor %}
+
+                <!-- 2. Record and Upload Question -->
+                <h2>2. Ask a question</h2>
                 <button id="record">Record</button>
                 <button id="stop">Stop</button>
                 <span id="timer">00:00</span>
                 <audio id="audio"></audio>
-                <form id="uploadForm" method="POST" enctype="multipart/form-data">
-                    <input type="hidden" name="audio_data" id="audioData">
-                </form>
-                <script src="script.js"></script>
 
                 <hr>
-                <h2>Recorded Files</h2>
+                <h2>Result</h2>
                 <ul>
                     {% for file in STT_files %}
-                        {% if file.endswith('.wav') %}
+                        {% if file.endswith('.wav') and 'answer' in file %}
                             <li>
                                 <strong>Audio:</strong><br>
                                 <audio controls>
                                     <source src="{{ url_for('uploaded_file', filename=file) }}">
                                     Your browser does not support the audio element.
                                 </audio><br>
-                                <strong>Text and Sentiment Transcript:</strong><br>
-                                <a href="{{ url_for('uploaded_file', filename=file.replace('.wav', '_text_and_sentiment.txt')) }}" target="_blank">
-                                    {{ file.replace('.wav', '_text_and_sentiment.txt') }}
-                                </a><br>
-                              
                             </li>
                             <hr>
                         {% endif %}
                     {% endfor %}
                 </ul>
             </td>
-            
-            
         </tr>
     </table>
 
+    <script>
+    const recordButton = document.getElementById('record');
+    const stopButton = document.getElementById('stop');
+    const timerDisplay = document.getElementById('timer');
+    const pdfInput = document.getElementById('pdfInput');
+    const fileNameDisplay = document.getElementById('fileName');
+
+    let mediaRecorder;
+    let audioChunks = [];
+    let startTime;
+
+    function formatTime(time) {
+        const minutes = Math.floor(time / 60);
+        const seconds = Math.floor(time % 60);
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    recordButton.addEventListener('click', () => {
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start();
+
+                audioChunks = [];
+                startTime = Date.now();
+                const timerInterval = setInterval(() => {
+                    const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+                    timerDisplay.textContent = formatTime(elapsedTime);
+                }, 1000);
+
+                mediaRecorder.ondataavailable = e => {
+                    audioChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    clearInterval(timerInterval);
+
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const formData = new FormData();
+                    formData.append('audio_data', audioBlob, 'recorded_audio.wav');
+
+                    fetch('/upload_audio', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Upload failed');
+                        }
+                        return response.text();
+                    })
+                    .then(data => {
+                        console.log('Audio upload successful:', data);
+                        location.reload();
+                    })
+                    .catch(error => {
+                        console.error('Audio upload error:', error);
+                    });
+                };
+            })
+            .catch(error => {
+                console.error('Microphone access error:', error);
+            });
+
+        recordButton.disabled = true;
+        stopButton.disabled = false;
+    });
+
+    stopButton.addEventListener('click', () => {
+        if (mediaRecorder) {
+            mediaRecorder.stop();
+        }
+        recordButton.disabled = false;
+        stopButton.disabled = true;
+    });
+
+    stopButton.disabled = true;
+
+    pdfInput.addEventListener('change', () => {
+        const selectedFile = pdfInput.files[0];
+        if (selectedFile) {
+            fileNameDisplay.textContent = `Selected file: ${selectedFile.name}`;
+        } else {
+            fileNameDisplay.textContent = '';
+        }
+    });
+
+    document.getElementById('pdfInput').addEventListener('change', function() {
+                        const fileNameSpan = document.getElementById('fileName');
+                        const file = this.files[0];
+                        if (file) {
+                            fileNameSpan.textContent = `Uploading: ${file.name}`;
+                            document.getElementById('pdfUploadForm').submit();
+                        }
+                    });
+    </script>
 </body>
 </html>

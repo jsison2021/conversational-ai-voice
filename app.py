@@ -3,18 +3,22 @@ from flask import Flask, render_template, request, redirect, url_for, send_file,
 from werkzeug.utils import secure_filename
 import vertexai
 from vertexai.generative_models import GenerativeModel, Part
+from google.cloud import texttospeech_v1
+
 import os
 
 app = Flask(__name__)
 
 # Configure upload folder
 UPLOAD_STT = 'UPLOAD_STT'
-ALLOWED_EXTENSIONS = {'wav', 'txt'}
+ALLOWED_EXTENSIONS = {'wav', 'pdf'}
 app.config['UPLOAD_STT'] = UPLOAD_STT
 
 os.makedirs(UPLOAD_STT, exist_ok=True)
 
 vertexai.init(project = "js-conversational-ai", location = "us-central1")
+
+client_TTS = texttospeech_v1.TextToSpeechClient()
 
 @app.route('/')
 def index():
@@ -29,60 +33,102 @@ def get_STT_files():
     files.sort(reverse=True)
     return files
 
-def process_audio_with_vertexai(audio_content):    
+def process_audio_and_pdf_with_vertexai(audio_content, pdf_content):    
     # Sentiment Analysis with Vertex AI
     model = GenerativeModel("gemini-1.5-flash-001")
     prompt = f"""
-                Please provide an exact transcript for the audio, followed by sentiment analysis.
-                
-                Your reponse should follow the format:
-                
-                Text: USERS SPEECH TRANSCRIPTION
-
-                SENTIMENT ANALYSIS: Positive | Neutral | Negative
+                Answer the user's query in the audio file based and use the PDF file as a reference.
                 
             """
-    contents = [Part.from_data(audio_content, mime_type="audio/wav"), prompt]
+    contents = [Part.from_data(audio_content, mime_type="audio/wav"), Part.from_data(pdf_content, mime_type = "application/pdf"), prompt]
     
     result = model.generate_content(contents)
-    print("Results:" + result.text)
+    print(result.text)
     return result.text
 
-@app.route('/upload', methods=['POST'])
-def upload_audio():
-    if 'audio_data' not in request.files:
-        return redirect(request.url)
-    
-    file = request.files['audio_data']
-    if file.filename == '':
-        return redirect(request.url)
-    
-    if file:
+
+def sample_synthesize_speech(text=None, ssml=None):
+    input = texttospeech_v1.SynthesisInput()
+    if ssml:
+      input.ssml = ssml
+    else:
+      input.text = text
+
+    voice = texttospeech_v1.VoiceSelectionParams()
+    voice.language_code = "en-UK"
+    # voice.ssml_gender = "MALE"
+
+    audio_config = texttospeech_v1.AudioConfig()
+    audio_config.audio_encoding = "LINEAR16"
+
+    request = texttospeech_v1.SynthesizeSpeechRequest(
+        input=input,
+        voice=voice,
+        audio_config=audio_config,
+    )
+
+    response = client_TTS.synthesize_speech(request=request)
+
+    return response.audio_content
+
+@app.route('/upload_pdf', methods=['POST'])
+def upload_pdf():
+    pdf = request.files.get('pdf_file')
+    if pdf and pdf.filename != '':
         timestamp = datetime.now().strftime("%Y%m%d-%I%M%S%p")
-        audio_filename = f"{timestamp}.wav"
-        audio_file_path = os.path.join(app.config['UPLOAD_STT'], audio_filename)
-        file.save(audio_file_path)
 
-        with open(audio_file_path, 'rb') as audio_file:
-            audio_content = audio_file.read()
+        # Reset the STT folder
+        for f in os.listdir(app.config['UPLOAD_STT']):
+            file_path = os.path.join(app.config['UPLOAD_STT'], f)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
 
-        sentiment_result = process_audio_with_vertexai(audio_content)
-        
-        transcript_filename = f"{timestamp}_text_and_sentiment.txt"
-        transcript_path = os.path.join(app.config['UPLOAD_STT'], transcript_filename)
-        with open(transcript_path, 'w') as transcript_file:
-            transcript_file.write(sentiment_result)
-    
+        pdf_filename = f"{secure_filename(pdf.filename)}_{timestamp}.pdf"
+        pdf_file_path = os.path.join(app.config['UPLOAD_STT'], pdf_filename)
+        pdf.save(pdf_file_path)
 
     return redirect('/')
 
-@app.route('/upload/<filename>')
-def get_file(filename):
-    return send_file(filename)
+@app.route('/upload_audio', methods=['POST'])
+def upload_audio():
+    if 'audio_data' not in request.files:
+        return abort(400, "No audio file uploaded.")
 
-@app.route('/script.js', methods=['GET'])
-def scripts_js():
-    return send_file('./script.js')
+    file = request.files['audio_data']
+    if file.filename == '':
+        return abort(400, "Empty audio file.")
+
+    # Find latest PDF
+    pdf_files = [f for f in os.listdir(app.config['UPLOAD_STT']) if f.lower().endswith('.pdf')]
+    if not pdf_files:
+        return abort(400, "No PDF uploaded yet.")
+    pdf_files.sort(reverse=True)
+    pdf_file_path = os.path.join(app.config['UPLOAD_STT'], pdf_files[0])
+    pdf_filename = pdf_files[0]
+
+    # Save audio
+    timestamp = datetime.now().strftime("%Y%m%d-%I%M%S%p")
+    audio_filename = f"question_{timestamp}.wav"
+    audio_file_path = os.path.join(app.config['UPLOAD_STT'], audio_filename)
+    file.save(audio_file_path)
+
+    # Process
+    with open(audio_file_path, 'rb') as audio_file:
+        audio_content = audio_file.read()
+
+    with open(pdf_file_path, 'rb') as pdf_file:
+        pdf_content = pdf_file.read()
+
+    sentiment_result = process_audio_and_pdf_with_vertexai(audio_content, pdf_content)
+    audio_response_content = sample_synthesize_speech(text=sentiment_result)
+
+    # Save response audio
+    response_audio_filename = f"answer_{timestamp}.wav"
+    response_audio_path = os.path.join(app.config['UPLOAD_STT'], response_audio_filename)
+    with open(response_audio_path, 'wb') as audio_file:
+        audio_file.write(audio_response_content)
+
+    return redirect('/')
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
